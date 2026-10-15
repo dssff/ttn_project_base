@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>База даних та API менеджер</title>
+  <!-- Bootstrap 5 CSS & Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .navbar-brand {
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .nav-pills .nav-link {
+      color: #475569;
+      font-weight: 500;
+      border-radius: 8px;
+      padding: 10px 16px;
+      transition: all 0.2s ease-in-out;
+    }
+    .nav-pills .nav-link.active {
+      background-color: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25);
+    }
+    .card {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+    .table-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border: 1px solid #e2e8f0;
+      overflow-x: auto;
+    }
+    .table > :not(caption) > * > * {
+      padding: 12px 14px;
+      vertical-align: middle;
+      font-size: 0.92rem;
+    }
+    .table thead th {
+      background-color: #f1f5f9;
+      color: #334155;
+      font-weight: 600;
+      border-bottom: 2px solid #cbd5e1;
+      white-space: nowrap;
+    }
+    .badge-count {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 12px;
+    }
+    .action-btn {
+      padding: 4px 8px;
+      font-size: 0.85rem;
+    }
+    pre.code-block {
+      background: #1e293b;
+      color: #38bdf8;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+    /* Fallback для модальних вікон на випадок збоїв Bootstrap CDN */
+    .modal.custom-show {
+      display: block !important;
+      background-color: rgba(15, 23, 42, 0.65) !important;
+      backdrop-filter: blur(2px);
+      z-index: 1055 !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Навігаційна шапка -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
+    <div class="container-fluid px-4">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+        <i class="bi bi-database-fill-gear text-primary fs-4"></i>
+        <span>DB & REST API Manager</span>
+      </a>
+      <div class="d-flex align-items-center gap-2">
+        <a href="/docs" target="_blank" class="btn btn-outline-info btn-sm d-flex align-items-center gap-1">
+          <i class="bi bi-file-earmark-code"></i>
+          <span>Swagger API Документація (/docs)</span>
+        </a>
+        <a href="/api/export/all" target="_blank" class="btn btn-outline-light btn-sm d-flex align-items-center gap-1">
+          <i class="bi bi-download"></i>
+          <span>Експорт всієї БД (JSON)</span>
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid px-4 py-4">
+    <!-- Верхній блок інформації -->
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="card p-3 bg-white">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+              <h5 class="mb-1 text-dark fw-bold">Управління базою даних та API</h5>
+              <p class="text-muted mb-0 small">
+                Вносьте або редагуйте записи через інтерфейс. Будь-яка зовнішня система може надсилати та отримувати ці дані через JSON REST API.
+              </p>
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary d-flex align-items-center gap-2" id="btnAddRecord" onclick="openCreateModal()">
+                <i class="bi bi-plus-circle"></i>
+                <span id="btnAddNewLabel">Додати запис</span>
+              </button>
+              <button class="btn btn-outline-secondary d-flex align-items-center gap-2" onclick="loadActiveTableData()">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span>Оновити</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Вкладки вибору таблиці -->
+    <div class="card p-2 mb-3 bg-white">
+      <ul class="nav nav-pills flex-wrap gap-1" id="tableTabs" role="tablist">
+        <li class="nav-item">
+          <button class="nav-link active" data-table="kontragents" onclick="switchTable('kontragents', this)">
+            <i class="bi bi-buildings me-1"></i> Kontragents
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-kontragents">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="data_info" onclick="switchTable('data_info', this)">
+            <i class="bi bi-info-circle me-1"></i> Data Info
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-data_info">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="people" onclick="switchTable('people', this)">
+            <i class="bi bi-people me-1"></i> People
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-people">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="place" onclick="switchTable('place', this)">
+            <i class="bi bi-geo-alt me-1"></i> Place
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-place">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="technika" onclick="switchTable('technika', this)">
+            <i class="bi bi-truck me-1"></i> Technika
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-technika">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="dop_data_technika" onclick="switchTable('dop_data_technika', this)">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Dop Data Technika
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-dop_data_technika">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="api_info" onclick="switchTable('api_info', this)">
+            <i class="bi bi-code-slash me-1"></i> API & Інтеграція
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Блок з пошуком та таблицею -->
+    <div id="tableSection">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="input-group" style="max-width: 380px;">
+          <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Швидкий пошук по рядках..." oninput="filterTable()">
+        </div>
+        <div class="text-muted small" id="tableStatusText">
+          Завантаження...
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="table table-hover table-striped mb-0" id="mainDataTable">
+          <thead id="tableHead">
+            <!-- Headers injected via JS -->
+          </thead>
+          <tbody id="tableBody">
+            <!-- Rows injected via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Блок довідки по API -->
+    <div id="apiSection" style="display: none;">
+      <div class="card p-4 bg-white mb-3">
+        <h4 class="fw-bold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Інструкція по роботі з API</h4>
+        <p>Усі дані таблиць доступні через повноцінний REST API у форматі JSON. Ви можете інтегрувати їх з будь-якою зовнішньою програмою, 1С, Telegram-ботом, мобільним додатком або веб-сервісом.</p>
+        
+        <h5 class="fw-semibold mt-4">1. Інтерактивна специфікація OpenAPI / Swagger</h5>
+        <p>Відкрийте <a href="/docs" target="_blank" class="fw-bold">/docs</a> для тестування будь-яких запитів онлайн безпосередньо у браузері.</p>
+
+        <h5 class="fw-semibold mt-4">2. Приклади API-запитів (cURL)</h5>
+        
+        <label class="fw-semibold text-muted small">Отримати список контрагентів з деталями (GET):</label>
+        <pre class="code-block"><code>curl -X GET "http://127.0.0.1:8000/api/kontragents/" -H "accept: application/json"</code></pre>
+
+        <label class="fw-semibold text-muted small mt-2">Додати контрагента з адресою, телефоном та факсом (POST):</label>
+        <pre class="code-block"><code>curl -X POST "http://127.0.0.1:8000/api/kontragents/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "medcode": "MED-1005",
+    "name": "ТОВ Нива",
+    "full_name": "Товариство з обмеженою відповідальністю Нива",
+    "ipn": "123456789012",
+    "endpou": "12345678",
+    "ur_fiz": "Юридична особа",
+    "ur_address": "м. Полтава, вул. Шевченка, 10",
+    "phone": "+380532112233",
+    "fax": "+380532112234"
+  }'</code></pre>
+
+        <label class="fw-semibold text-muted small mt-2">Отримати всі дані бази в один клік:</label>
+        <pre class="code-block"><code>curl -X GET "http://127.0.0.1:8000/api/export/all"</code></pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Універсальне модальне вікно додавання/редагування -->
+  <div class="modal fade" id="recordModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="modalTitle">Додати новий запис</h5>
+          <button type="button" class="btn-close" onclick="closeModalById('recordModal')" aria-label="Закрити"></button>
+        </div>
+        <div class="modal-body">
+          <form id="recordForm" onsubmit="event.preventDefault(); submitRecordForm();">
+            <input type="hidden" id="editRecordId" value="">
+            <div class="row g-3" id="formFieldsContainer">
+              <!-- Форма генерується динамічно відповідно до поточної таблиці -->
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModalById('recordModal')">Скасувати</button>
+          <button type="button" class="btn btn-primary" onclick="submitRecordForm()">
+            <i class="bi bi-check-circle me-1"></i> Зберегти
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальне вікно підтвердження видалення -->
+  <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Підтвердження видалення</h5>
+          <button type="button" class="btn-close btn-close-white" onclick="closeModalById('deleteModal')"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Ви дійсно бажаєте видалити цей запис (ID: <strong id="deleteTargetId"></strong>)?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeModalById('deleteModal')">Ні, скасувати</button>
+          <button type="button" class="btn btn-danger" onclick="confirmDelete()">Видалити</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Спливаючі сповіщення (Toast) -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    <div id="liveToast" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="d-flex">
+        <div class="toast-body" id="toastMessage">
+          Дію успішно виконано!
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="hideToast()"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS (якщо доступний) -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // Конфігурація колонок для кожної таблиці
+    const TABLE_CONFIGS = {
+      kontragents: {
+        title: "Контрагенти (kontragents)",
+        apiPath: "/api/kontragents/",
+        fields: [
+          { key: "medcode", label: "MedCode", type: "text" },
+          { key: "name", label: "Назва (name)", type: "text" },
+          { key: "full_name", label: "Повна назва (full_name)", type: "text" },
+          { key: "ipn", label: "ІПН (ipn)", type: "text" },
+          { key: "endpou", label: "ЄДРПОУ (endpou)", type: "text" },
+          { key: "ur_fiz", label: "Юр / Фіз особа (ur_fiz)", type: "text" },
+          { key: "ur_address", label: "Юр. адреса (в data_info)", type: "text", isDataInfo: true },
+          { key: "phone", label: "Телефон (в data_info)", type: "text", isDataInfo: true },
+          { key: "fax", label: "Факс (в data_info)", type: "text", isDataInfo: true }
+        ]
+      },
+      data_info: {
+        title: "Data Info (data_info)",
+        apiPath: "/api/data_info/",
+        fields: [
+          { key: "object", label: "Об'єкт (object)", type: "text" },
+          { key: "type", label: "Тип (type)", type: "text" },
+          { key: "k", label: "Ключ (k)", type: "text" },
+          { key: "v", label: "Значення (v)", type: "textarea" }
+        ]
+      },
+      people: {
+        title: "Люди / Персонал (people)",
+        apiPath: "/api/people/",
+        fields: [
+          { key: "code", label: "Код (code)", type: "text" },
+          { key: "name", label: "Ім'я (name)", type: "text" },
+          { key: "full_name", label: "ПІБ (full_name)", type: "text" }
+        ]
+      },
+      place: {
+        title: "Місця / Поля (place)",
+        apiPath: "/api/place/",
+        fields: [
+          { key: "name", label: "Назва (name)", type: "text" },
+          { key: "owner", label: "Власник (owner)", type: "text" },
+          { key: "area", label: "Площа (area)", type: "text" },
+          { key: "crop", label: "Культура (crop)", type: "text" },
+          { key: "people", label: "Відповідальний (people)", type: "text" }
+        ]
+      },
+      technika: {
+        title: "Техніка (technika)",
+        apiPath: "/api/technika/",
+        fields: [
+          { key: "avtomobil", label: "Автомобіль", type: "text" },
+          { key: "misce_ystanovky", label: "Місце установки", type: "text" },
+          { key: "derj_nomer", label: "Держ. номер", type: "text" },
+          { key: "vin", label: "VIN код", type: "text" },
+          { key: "d", label: "D", type: "text" },
+          { key: "w", label: "W", type: "text" },
+          { key: "rik", label: "Рік", type: "text" },
+          { key: "v", label: "V", type: "text" },
+          { key: "ekipaj", label: "Екіпаж", type: "text" },
+          { key: "telefony", label: "Телефони", type: "text" },
+          { key: "pricep", label: "Причіп", type: "text" },
+          { key: "kontragent", label: "Контрагент", type: "text" },
+          { key: "model", label: "Модель", type: "text" },
+          { key: "kolir", label: "Колір", type: "text" },
+          { key: "telegram", label: "Telegram", type: "text" },
+          { key: "medcode", label: "MedCode", type: "text" },
+          { key: "wialon_id", label: "Wialon ID", type: "text" },
+          { key: "dodatkovo", label: "Додатково", type: "textarea" }
+        ]
+      },
+      dop_data_technika: {
+        title: "Дод. дані техніки (dop_data_technika)",
+        apiPath: "/api/dop_data_technika/",
+        fields: [
+          { key: "ts", label: "ТС / ТЗ (ts)", type: "text" },
+          { key: "rik", label: "Рік (rik)", type: "text" },
+          { key: "vin", label: "VIN код", type: "text" },
+          { key: "d", label: "D", type: "text" },
+          { key: "w", label: "W", type: "text" },
+          { key: "v", label: "V", type: "text" },
+          { key: "misce_zberiganny", label: "Місце зберігання", type: "text" }
+        ]
+      }
+    };
+
+    let currentTable = 'kontragents';
+    let currentData = [];
+    let itemToDeleteId = null;
+
+    // Універсальні методи відкриття та закриття модальних вікон (працюють навіть без Bootstrap JS)
+    function openModalById(modalId) {
+      const el = document.getElementById(modalId);
+      if (!el) return;
+      if (window.bootstrap && bootstrap.Modal) {
+        try {
+          let inst = bootstrap.Modal.getInstance(el);
+          if (!inst) inst = new bootstrap.Modal(el);
+          inst.show();
+          return;
+        } catch (e) {
+          console.warn("Bootstrap modal exception, falling back:", e);
+        }
+      }
+      // Fallback
+      el.classList.add('custom-show');
+      el.style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModalById(modalId) {
+      const el = document.getElementById(modalId);
+      if (!el) return;
+      if (window.bootstrap && bootstrap.Modal) {
+        try {
+          let inst = bootstrap.Modal.getInstance(el);
+          if (inst) inst.hide();
+        } catch (e) {}
+      }
+      el.classList.remove('custom-show');
+      el.style.display = 'none';
+      document.body.style.overflow = 'auto';
+      document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+    }
+
+    function showToast(message, isSuccess = true) {
+      const toastEl = document.getElementById('liveToast');
+      const toastMessage = document.getElementById('toastMessage');
+      if (!toastEl || !toastMessage) return;
+      toastMessage.innerText = message;
+      toastEl.className = `toast align-items-center text-white border-0 ${isSuccess ? 'bg-success' : 'bg-danger'}`;
+      if (window.bootstrap && bootstrap.Toast) {
+        try {
+          const toast = new bootstrap.Toast(toastEl);
+          toast.show();
+          return;
+        } catch(e) {}
+      }
+      toastEl.classList.add('show');
+      setTimeout(() => hideToast(), 3500);
+    }
+
+    function hideToast() {
+      const toastEl = document.getElementById('liveToast');
+      if (toastEl) toastEl.classList.remove('show');
+    }
+
+    async function loadAllBadges() {
+      for (const tableKey of Object.keys(TABLE_CONFIGS)) {
+        try {
+          const res = await fetch(TABLE_CONFIGS[tableKey].apiPath);
+          if (res.ok) {
+            const data = await res.json();
+            const badge = document.getElementById(`badge-${tableKey}`);
+            if (badge) badge.innerText = data.length;
+          }
+        } catch (e) {
+          console.error("Помилка завантаження кількості для " + tableKey, e);
+        }
+      }
+    }
+
+    function switchTable(tableKey, clickedBtn = null) {
+      currentTable = tableKey;
+
+      // Оновлюємо стан кнопок табів
+      document.querySelectorAll('#tableTabs .nav-link').forEach(btn => btn.classList.remove('active'));
+      if (clickedBtn) {
+        clickedBtn.classList.add('active');
+      } else {
+        const found = document.querySelector(`button[data-table="${tableKey}"]`);
+        if (found) found.classList.add('active');
+      }
+
+      if (tableKey === 'api_info') {
+        document.getElementById('tableSection').style.display = 'none';
+        document.getElementById('apiSection').style.display = 'block';
+        return;
+      }
+
+      document.getElementById('tableSection').style.display = 'block';
+      document.getElementById('apiSection').style.display = 'none';
+
+      const config = TABLE_CONFIGS[tableKey];
+      if (config) {
+        document.getElementById('btnAddNewLabel').innerText = `Додати в ${config.title.split(' ')[0]}`;
+      }
+      document.getElementById('searchInput').value = '';
+
+      loadActiveTableData();
+    }
+
+    async function loadActiveTableData() {
+      const config = TABLE_CONFIGS[currentTable];
+      if (!config) return;
+
+      document.getElementById('tableStatusText').innerText = 'Завантаження даних...';
+
+      try {
+        const response = await fetch(config.apiPath);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        currentData = await response.json();
+
+        // Оновимо бейдж
+        const badge = document.getElementById(`badge-${currentTable}`);
+        if (badge) badge.innerText = currentData.length;
+
+        renderTable(currentData);
+        document.getElementById('tableStatusText').innerText = `Всього записів: ${currentData.length}`;
+      } catch (err) {
+        console.error("loadActiveTableData error:", err);
+        document.getElementById('tableStatusText').innerText = 'Помилка завантаження даних!';
+        showToast("Не вдалося завантажити дані таблиці", false);
+      }
+    }
+
+    function renderTable(dataToRender) {
+      const config = TABLE_CONFIGS[currentTable];
+      const thead = document.getElementById('tableHead');
+      const tbody = document.getElementById('tableBody');
+
+      // Формуємо заголовки таблиці
+      let headerHtml = '<tr><th style="width: 70px;">ID</th>';
+      config.fields.forEach(f => {
+        headerHtml += `<th>${f.label}</th>`;
+      });
+      headerHtml += '<th class="text-end" style="width: 140px;">Дії</th></tr>';
+      thead.innerHTML = headerHtml;
+
+      // Формуємо рядки таблиці
+      if (!dataToRender || dataToRender.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${config.fields.length + 2}" class="text-center py-4 text-muted">Записів не знайдено</td></tr>`;
+        return;
+      }
+
+      let rowsHtml = '';
+      dataToRender.forEach(row => {
+        rowsHtml += `<tr>`;
+        rowsHtml += `<td><span class="badge bg-secondary">#${row.id}</span></td>`;
+        config.fields.forEach(f => {
+          const val = row[f.key] !== null && row[f.key] !== undefined ? String(row[f.key]) : '';
+          const displayVal = val.length > 50 ? val.substring(0, 47) + '...' : val;
+          rowsHtml += `<td title="${val.replace(/"/g, '&quot;')}">${displayVal || '<span class="text-muted fst-italic">—</span>'}</td>`;
+        });
+        rowsHtml += `
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-primary action-btn me-1" onclick="openEditModal(${row.id})" title="Редагувати">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger action-btn" onclick="openDeleteModal(${row.id})" title="Видалити">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        `;
+        rowsHtml += `</tr>`;
+      });
+      tbody.innerHTML = rowsHtml;
+    }
+
+    function filterTable() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      if (!q) {
+        renderTable(currentData);
+        return;
+      }
+      const filtered = currentData.filter(item => {
+        return Object.values(item).some(val => 
+          val !== null && val !== undefined && String(val).toLowerCase().includes(q)
+        );
+      });
+      renderTable(filtered);
+      document.getElementById('tableStatusText').innerText = `Знайдено: ${filtered.length} з ${currentData.length}`;
+    }
+
+    function openCreateModal() {
+      try {
+        const config = TABLE_CONFIGS[currentTable];
+        if (!config) return;
+
+        document.getElementById('modalTitle').innerText = `Новий запис: ${config.title}`;
+        document.getElementById('editRecordId').value = '';
+
+        buildFormFields({});
+        openModalById('recordModal');
+      } catch (err) {
+        console.error("openCreateModal error:", err);
+        alert("Помилка відкриття вікна створення: " + err.message);
+      }
+    }
+
+    async function openEditModal(id) {
+      try {
+        const config = TABLE_CONFIGS[currentTable];
+        if (!config) return;
+
+        document.getElementById('modalTitle').innerText = `Редагування запису #${id} (${config.title})`;
+        document.getElementById('editRecordId').value = id;
+
+        // Запитуємо актуальні дані з сервера (разом із завантаженням зв'язаних полів з data_info)
+        let itemToEdit = null;
+        try {
+          const res = await fetch(`${config.apiPath}${id}`);
+          if (res.ok) {
+            itemToEdit = await res.json();
+          }
+        } catch(e) {
+          console.warn("Помилка підвантаження з сервера, використовуємо кеш:", e);
+        }
+
+        if (!itemToEdit) {
+          itemToEdit = currentData.find(d => Number(d.id) === Number(id)) || {};
+        }
+
+        buildFormFields(itemToEdit);
+        openModalById('recordModal');
+      } catch (err) {
+        console.error("openEditModal error:", err);
+        alert("Помилка відкриття вікна редагування: " + err.message);
+      }
+    }
+
+    function buildFormFields(data) {
+      const config = TABLE_CONFIGS[currentTable];
+      const container = document.getElementById('formFieldsContainer');
+      let fieldsHtml = '';
+      let dataInfoSectionAdded = false;
+
+      config.fields.forEach(f => {
+        const val = data[f.key] !== undefined && data[f.key] !== null ? data[f.key] : '';
+        const colClass = f.type === 'textarea' ? 'col-12' : 'col-md-6';
+        
+        if (f.isDataInfo && !dataInfoSectionAdded) {
+          dataInfoSectionAdded = true;
+          fieldsHtml += `
+            <div class="col-12 mt-3 pt-2 border-top">
+              <div class="d-flex align-items-center text-primary fw-bold small mb-1">
+                <i class="bi bi-link-45deg fs-5 me-1"></i>
+                <span>Детальні дані контрагента (автоматично записуються в таблицю data_info):</span>
+              </div>
+            </div>
+          `;
+        }
+
+        fieldsHtml += `
+          <div class="${colClass}">
+            <label class="form-label fw-semibold small ${f.isDataInfo ? 'text-primary' : 'text-secondary'}">${f.label}</label>
+            ${f.type === 'textarea' 
+              ? `<textarea class="form-control" name="${f.key}" rows="3" placeholder="Введіть ${f.label.toLowerCase()}">${val}</textarea>` 
+              : `<input type="text" class="form-control" name="${f.key}" value="${String(val).replace(/"/g, '&quot;')}" placeholder="Введіть ${f.label.toLowerCase()}">`}
+          </div>
+        `;
+      });
+
+      container.innerHTML = fieldsHtml;
+    }
+
+    async function submitRecordForm() {
+      const config = TABLE_CONFIGS[currentTable];
+      if (!config) return;
+
+      const editId = document.getElementById('editRecordId').value;
+      const form = document.getElementById('recordForm');
+      const formData = new FormData(form);
+
+      const payload = {};
+      config.fields.forEach(f => {
+        payload[f.key] = formData.get(f.key) || null;
+      });
+
+      const url = editId ? `${config.apiPath}${editId}` : config.apiPath;
+      const method = editId ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.detail || `HTTP ${res.status}: Помилка збереження`);
+        }
+
+        closeModalById('recordModal');
+        showToast(editId ? "Запис успішно оновлено!" : "Запис успішно додано!");
+        await loadActiveTableData();
+        await loadAllBadges();
+      } catch (e) {
+        console.error("submitRecordForm error:", e);
+        alert("Помилка при збереженні: " + e.message);
+      }
+    }
+
+    function openDeleteModal(id) {
+      itemToDeleteId = id;
+      document.getElementById('deleteTargetId').innerText = id;
+      openModalById('deleteModal');
+    }
+
+    async function confirmDelete() {
+      if (!itemToDeleteId) return;
+      const config = TABLE_CONFIGS[currentTable];
+
+      try {
+        const res = await fetch(`${config.apiPath}${itemToDeleteId}`, {
+          method: 'DELETE'
+        });
+
+        if (!res.ok) throw new Error("Не вдалося видалити запис");
+
+        closeModalById('deleteModal');
+        showToast("Запис та пов'язані дані в data_info успішно видалено!");
+        itemToDeleteId = null;
+        await loadActiveTableData();
+        await loadAllBadges();
+      } catch (e) {
+        console.error("confirmDelete error:", e);
+        alert("Помилка при видаленні: " + e.message);
+      }
+    }
+
+    // Ініціалізація при старті сторінки
+    window.addEventListener("DOMContentLoaded", () => {
+      loadAllBadges();
+      switchTable('kontragents');
+    });
+  </script>
+</body>
+</html>
