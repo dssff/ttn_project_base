@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>База даних та API менеджер</title>
+  <title>База даних та REST API менеджер (ТТН система)</title>
   <!-- Bootstrap 5 CSS & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -70,12 +70,48 @@
       max-height: 250px;
       overflow-y: auto;
     }
-    /* Fallback для модальних вікон на випадок збоїв Bootstrap CDN */
     .modal.custom-show {
       display: block !important;
       background-color: rgba(15, 23, 42, 0.65) !important;
       backdrop-filter: blur(2px);
       z-index: 1055 !important;
+    }
+    .autocomplete-wrapper {
+      position: relative;
+    }
+    .autocomplete-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      z-index: 1060;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      max-height: 240px;
+      overflow-y: auto;
+      margin-top: 4px;
+      display: none;
+    }
+    .autocomplete-item {
+      padding: 9px 12px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      transition: background-color 0.15s ease-in-out;
+    }
+    .autocomplete-item:last-child {
+      border-bottom: none;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active {
+      background-color: #eff6ff;
+    }
+    .autocomplete-item strong {
+      color: #1e293b;
+    }
+    .autocomplete-item .meta-info {
+      font-size: 0.75rem;
+      color: #64748b;
     }
   </style>
 </head>
@@ -85,8 +121,8 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm">
     <div class="container-fluid px-4">
       <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-        <i class="bi bi-database-fill-gear text-primary fs-4"></i>
-        <span>DB & REST API Manager</span>
+        <i class="bi bi-truck-front text-primary fs-4"></i>
+        <span>ТТН База даних & REST API</span>
       </a>
       <div class="d-flex align-items-center gap-2">
         <a href="/docs" target="_blank" class="btn btn-outline-info btn-sm d-flex align-items-center gap-1">
@@ -95,7 +131,7 @@
         </a>
         <a href="/api/export/all" target="_blank" class="btn btn-outline-light btn-sm d-flex align-items-center gap-1">
           <i class="bi bi-download"></i>
-          <span>Експорт всієї БД (JSON)</span>
+          <span>Експорт всіх таблиць (JSON)</span>
         </a>
       </div>
     </div>
@@ -108,9 +144,9 @@
         <div class="card p-3 bg-white">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
-              <h5 class="mb-1 text-dark fw-bold">Управління базою даних та API</h5>
+              <h5 class="mb-1 text-dark fw-bold">Управління взаємопов'язаними таблицями ТТН</h5>
               <p class="text-muted mb-0 small">
-                Вносьте або редагуйте записи через інтерфейс. Будь-яка зовнішня система може надсилати та отримувати ці дані через JSON REST API.
+                Техніка автоматично підтягує габарити, перевізника з адресою та водія. Пункти завантаження пов'язані з комірниками та культурою з номенклатури.
               </p>
             </div>
             <div class="d-flex gap-2">
@@ -128,12 +164,12 @@
       </div>
     </div>
 
-    <!-- Вкладки вибору таблиці -->
+    <!-- Вкладки вибору таблиці (всі 7 таблиць) -->
     <div class="card p-2 mb-3 bg-white">
       <ul class="nav nav-pills flex-wrap gap-1" id="tableTabs" role="tablist">
         <li class="nav-item">
           <button class="nav-link active" data-table="kontragents" onclick="switchTable('kontragents', this)">
-            <i class="bi bi-buildings me-1"></i> Kontragents
+            <i class="bi bi-buildings me-1"></i> Контрагенти
             <span class="badge bg-light text-dark ms-1 badge-count" id="badge-kontragents">0</span>
           </button>
         </li>
@@ -144,32 +180,33 @@
           </button>
         </li>
         <li class="nav-item">
-          <button class="nav-link" data-table="people" onclick="switchTable('people', this)">
-            <i class="bi bi-people me-1"></i> People
-            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-people">0</span>
-          </button>
-        </li>
-        <li class="nav-item">
-          <button class="nav-link" data-table="place" onclick="switchTable('place', this)">
-            <i class="bi bi-geo-alt me-1"></i> Place
-            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-place">0</span>
-          </button>
-        </li>
-        <li class="nav-item">
           <button class="nav-link" data-table="technika" onclick="switchTable('technika', this)">
-            <i class="bi bi-truck me-1"></i> Technika
+            <i class="bi bi-truck me-1"></i> Техніка
             <span class="badge bg-light text-dark ms-1 badge-count" id="badge-technika">0</span>
           </button>
         </li>
         <li class="nav-item">
           <button class="nav-link" data-table="dop_data_technika" onclick="switchTable('dop_data_technika', this)">
-            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Dop Data Technika
+            <i class="bi bi-aspect-ratio me-1"></i> Габарити ТЗ
             <span class="badge bg-light text-dark ms-1 badge-count" id="badge-dop_data_technika">0</span>
           </button>
         </li>
         <li class="nav-item">
-          <button class="nav-link" data-table="api_info" onclick="switchTable('api_info', this)">
-            <i class="bi bi-code-slash me-1"></i> API & Інтеграція
+          <button class="nav-link" data-table="people" onclick="switchTable('people', this)">
+            <i class="bi bi-people me-1"></i> Водії / Персонал
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-people">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="place" onclick="switchTable('place', this)">
+            <i class="bi bi-geo-alt me-1"></i> Точки завантаження
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-place">0</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-table="nomenklatyra" onclick="switchTable('nomenklatyra', this)">
+            <i class="bi bi-box-seam me-1"></i> Номенклатура / Вантажі
+            <span class="badge bg-light text-dark ms-1 badge-count" id="badge-nomenklatyra">0</span>
           </button>
         </li>
       </ul>
@@ -180,7 +217,7 @@
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div class="input-group" style="max-width: 380px;">
           <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
-          <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Швидкий пошук по рядках..." oninput="filterTable()">
+          <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Швидкий пошук по таблиці..." oninput="filterTable()">
         </div>
         <div class="text-muted small" id="tableStatusText">
           Завантаження...
@@ -189,47 +226,9 @@
 
       <div class="table-container">
         <table class="table table-hover table-striped mb-0" id="mainDataTable">
-          <thead id="tableHead">
-            <!-- Headers injected via JS -->
-          </thead>
-          <tbody id="tableBody">
-            <!-- Rows injected via JS -->
-          </tbody>
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
         </table>
-      </div>
-    </div>
-
-    <!-- Блок довідки по API -->
-    <div id="apiSection" style="display: none;">
-      <div class="card p-4 bg-white mb-3">
-        <h4 class="fw-bold mb-3"><i class="bi bi-terminal text-primary me-2"></i>Інструкція по роботі з API</h4>
-        <p>Усі дані таблиць доступні через повноцінний REST API у форматі JSON. Ви можете інтегрувати їх з будь-якою зовнішньою програмою, 1С, Telegram-ботом, мобільним додатком або веб-сервісом.</p>
-        
-        <h5 class="fw-semibold mt-4">1. Інтерактивна специфікація OpenAPI / Swagger</h5>
-        <p>Відкрийте <a href="/docs" target="_blank" class="fw-bold">/docs</a> для тестування будь-яких запитів онлайн безпосередньо у браузері.</p>
-
-        <h5 class="fw-semibold mt-4">2. Приклади API-запитів (cURL)</h5>
-        
-        <label class="fw-semibold text-muted small">Отримати список контрагентів з деталями (GET):</label>
-        <pre class="code-block"><code>curl -X GET "http://127.0.0.1:8000/api/kontragents/" -H "accept: application/json"</code></pre>
-
-        <label class="fw-semibold text-muted small mt-2">Додати контрагента з адресою, телефоном та факсом (POST):</label>
-        <pre class="code-block"><code>curl -X POST "http://127.0.0.1:8000/api/kontragents/" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "medcode": "MED-1005",
-    "name": "ТОВ Нива",
-    "full_name": "Товариство з обмеженою відповідальністю Нива",
-    "ipn": "123456789012",
-    "endpou": "12345678",
-    "ur_fiz": "Юридична особа",
-    "ur_address": "м. Полтава, вул. Шевченка, 10",
-    "phone": "+380532112233",
-    "fax": "+380532112234"
-  }'</code></pre>
-
-        <label class="fw-semibold text-muted small mt-2">Отримати всі дані бази в один клік:</label>
-        <pre class="code-block"><code>curl -X GET "http://127.0.0.1:8000/api/export/all"</code></pre>
       </div>
     </div>
 
@@ -271,6 +270,7 @@
         </div>
         <div class="modal-body">
           <p class="mb-0">Ви дійсно бажаєте видалити цей запис (ID: <strong id="deleteTargetId"></strong>)?</p>
+          <div class="small text-muted mt-2">Пов'язані дані в дочірніх таблицях також буде автоматично очищено.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModalById('deleteModal')">Ні, скасувати</button>
@@ -292,11 +292,17 @@
     </div>
   </div>
 
+  <!-- Спільні списки підказок (Datalists) для автоматичного заповнення форм -->
+  <datalist id="list_kontragents"></datalist>
+  <datalist id="list_people"></datalist>
+  <datalist id="list_nomenklatyra"></datalist>
+  <datalist id="list_technika_ts"></datalist>
+
   <!-- Bootstrap JS (якщо доступний) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    // Конфігурація колонок для кожної таблиці
+    // Конфігурація колонок для кожної з 7 таблиць
     const TABLE_CONFIGS = {
       kontragents: {
         title: "Контрагенти (kontragents)",
@@ -317,67 +323,80 @@
         title: "Data Info (data_info)",
         apiPath: "/api/data_info/",
         fields: [
-          { key: "object", label: "Об'єкт (object)", type: "text" },
+          { key: "object", label: "Об'єкт (контрагент/пристрій)", type: "text", lookup: "kontragents" },
           { key: "type", label: "Тип (type)", type: "text" },
           { key: "k", label: "Ключ (k)", type: "text" },
           { key: "v", label: "Значення (v)", type: "textarea" }
-        ]
-      },
-      people: {
-        title: "Люди / Персонал (people)",
-        apiPath: "/api/people/",
-        fields: [
-          { key: "code", label: "Код (code)", type: "text" },
-          { key: "name", label: "Ім'я (name)", type: "text" },
-          { key: "full_name", label: "ПІБ (full_name)", type: "text" }
-        ]
-      },
-      place: {
-        title: "Місця / Поля (place)",
-        apiPath: "/api/place/",
-        fields: [
-          { key: "name", label: "Назва (name)", type: "text" },
-          { key: "owner", label: "Власник (owner)", type: "text" },
-          { key: "area", label: "Площа (area)", type: "text" },
-          { key: "crop", label: "Культура (crop)", type: "text" },
-          { key: "people", label: "Відповідальний (people)", type: "text" }
         ]
       },
       technika: {
         title: "Техніка (technika)",
         apiPath: "/api/technika/",
         fields: [
-          { key: "avtomobil", label: "Автомобіль", type: "text" },
-          { key: "misce_ystanovky", label: "Місце установки", type: "text" },
+          { key: "avtomobil", label: "Автомобіль / Держномер", type: "text", lookup: "technika_ts" },
           { key: "derj_nomer", label: "Держ. номер", type: "text" },
-          { key: "vin", label: "VIN код", type: "text" },
-          { key: "d", label: "D", type: "text" },
-          { key: "w", label: "W", type: "text" },
-          { key: "rik", label: "Рік", type: "text" },
-          { key: "v", label: "V", type: "text" },
-          { key: "ekipaj", label: "Екіпаж", type: "text" },
-          { key: "telefony", label: "Телефони", type: "text" },
-          { key: "pricep", label: "Причіп", type: "text" },
-          { key: "kontragent", label: "Контрагент", type: "text" },
           { key: "model", label: "Модель", type: "text" },
+          { key: "pricep", label: "Причіп", type: "text" },
+          { key: "kontragent", label: "Перевізник (kontragents)", type: "text", lookup: "kontragents", strict: true },
+          { key: "ekipaj", label: "Водій / Екіпаж (people)", type: "text", lookup: "people", strict: true },
+          { key: "telefony", label: "Телефони", type: "text" },
+          { key: "rik", label: "Рік (rik)", type: "text", isDopData: true },
+          { key: "vin", label: "VIN код", type: "text", isDopData: true },
+          { key: "d", label: "Довжина D (м)", type: "text", isDopData: true },
+          { key: "w", label: "Ширина W (м)", type: "text", isDopData: true },
+          { key: "v", label: "Висота V (м)", type: "text", isDopData: true },
+          { key: "misce_zberiganny", label: "Місце зберігання (dop_data)", type: "text", isDopData: true },
           { key: "kolir", label: "Колір", type: "text" },
           { key: "telegram", label: "Telegram", type: "text" },
           { key: "medcode", label: "MedCode", type: "text" },
           { key: "wialon_id", label: "Wialon ID", type: "text" },
+          { key: "misce_ystanovky", label: "Місце установки", type: "text" },
           { key: "dodatkovo", label: "Додатково", type: "textarea" }
         ]
       },
       dop_data_technika: {
-        title: "Дод. дані техніки (dop_data_technika)",
+        title: "Габарити ТЗ (dop_data_technika)",
         apiPath: "/api/dop_data_technika/",
         fields: [
-          { key: "ts", label: "ТС / ТЗ (ts)", type: "text" },
-          { key: "rik", label: "Рік (rik)", type: "text" },
+          { key: "ts", label: "ТС / Держномер (ts)", type: "text", lookup: "technika_ts" },
+          { key: "rik", label: "Рік випуску (rik)", type: "text" },
           { key: "vin", label: "VIN код", type: "text" },
-          { key: "d", label: "D", type: "text" },
-          { key: "w", label: "W", type: "text" },
-          { key: "v", label: "V", type: "text" },
+          { key: "d", label: "Довжина D (м)", type: "text" },
+          { key: "w", label: "Ширина W (м)", type: "text" },
+          { key: "v", label: "Висота V (м)", type: "text" },
           { key: "misce_zberiganny", label: "Місце зберігання", type: "text" }
+        ]
+      },
+      people: {
+        title: "Водії / Персонал (people)",
+        apiPath: "/api/people/",
+        fields: [
+          { key: "code", label: "Табельний код (code)", type: "text" },
+          { key: "name", label: "Ім'я (name)", type: "text" },
+          { key: "full_name", label: "ПІБ повністю (full_name)", type: "text" }
+        ]
+      },
+      place: {
+        title: "Точки завантаження (place)",
+        apiPath: "/api/place/",
+        fields: [
+          { key: "name", label: "Назва складу / поля (name)", type: "text" },
+          { key: "owner", label: "Власник (owner)", type: "text" },
+          { key: "area", label: "Площа (area)", type: "text" },
+          { key: "crop", label: "Культура / вантаж (crop)", type: "text" },
+          { key: "people", label: "Комірник / Здав (people)", type: "text" }
+        ]
+      },
+      nomenklatyra: {
+        title: "Номенклатура / Вантажі (nomenklatyra)",
+        apiPath: "/api/nomenklatyra/",
+        fields: [
+          { key: "code", label: "Код номенклатури (code)", type: "text" },
+          { key: "name", label: "Назва вантажу / культури (name)", type: "text" },
+          { key: "type", label: "Тип вантажу", type: "text" },
+          { key: "od_vym", label: "Одиниця виміру (т, кг)", type: "text" },
+          { key: "vpv_1_3", label: "Характеристики ТТН (vpv_1_3)", type: "text" },
+          { key: "dodatkovo", label: "Додаткова інформація", type: "textarea" }
         ]
       }
     };
@@ -386,7 +405,14 @@
     let currentData = [];
     let itemToDeleteId = null;
 
-    // Універсальні методи відкриття та закриття модальних вікон (працюють навіть без Bootstrap JS)
+    // Кешовані списки сутностей для автозаповнення зв'язків
+    let cachedLookups = {
+      kontragents: [],
+      people: [],
+      nomenklatyra: [],
+      technika_ts: []
+    };
+
     function openModalById(modalId) {
       const el = document.getElementById(modalId);
       if (!el) return;
@@ -396,11 +422,8 @@
           if (!inst) inst = new bootstrap.Modal(el);
           inst.show();
           return;
-        } catch (e) {
-          console.warn("Bootstrap modal exception, falling back:", e);
-        }
+        } catch (e) {}
       }
-      // Fallback
       el.classList.add('custom-show');
       el.style.display = 'block';
       document.body.style.overflow = 'hidden';
@@ -443,7 +466,8 @@
       if (toastEl) toastEl.classList.remove('show');
     }
 
-    async function loadAllBadges() {
+    async function loadAllBadgesAndLookups() {
+      // 1. Завантажуємо бейджі по всіх таблицях
       for (const tableKey of Object.keys(TABLE_CONFIGS)) {
         try {
           const res = await fetch(TABLE_CONFIGS[tableKey].apiPath);
@@ -451,17 +475,39 @@
             const data = await res.json();
             const badge = document.getElementById(`badge-${tableKey}`);
             if (badge) badge.innerText = data.length;
+
+            // Зберігаємо повні дані для інтерактивного пошуку та суворої валідації
+            if (tableKey === 'kontragents') {
+              cachedLookups.kontragents = data;
+            } else if (tableKey === 'people') {
+              cachedLookups.people = data;
+            } else if (tableKey === 'nomenklatyra') {
+              cachedLookups.nomenklatyra = data;
+            } else if (tableKey === 'technika') {
+              cachedLookups.technika_ts = data;
+            }
           }
         } catch (e) {
-          console.error("Помилка завантаження кількості для " + tableKey, e);
+          console.error("Помилка завантаження " + tableKey, e);
         }
       }
+
+      // 2. Оновлюємо HTML-списки підказок (datalists)
+      updateDatalist('list_kontragents', cachedLookups.kontragents.map(x => x.name || x.full_name).filter(Boolean));
+      updateDatalist('list_people', cachedLookups.people.map(x => x.full_name || x.name).filter(Boolean));
+      updateDatalist('list_nomenklatyra', cachedLookups.nomenklatyra.map(x => x.name).filter(Boolean));
+      updateDatalist('list_technika_ts', cachedLookups.technika_ts.map(x => x.avtomobil || x.derj_nomer).filter(Boolean));
+    }
+
+    function updateDatalist(elementId, items) {
+      const dl = document.getElementById(elementId);
+      if (!dl) return;
+      dl.innerHTML = items.map(val => `<option value="${String(val).replace(/"/g, '&quot;')}">`).join('');
     }
 
     function switchTable(tableKey, clickedBtn = null) {
       currentTable = tableKey;
 
-      // Оновлюємо стан кнопок табів
       document.querySelectorAll('#tableTabs .nav-link').forEach(btn => btn.classList.remove('active'));
       if (clickedBtn) {
         clickedBtn.classList.add('active');
@@ -469,15 +515,6 @@
         const found = document.querySelector(`button[data-table="${tableKey}"]`);
         if (found) found.classList.add('active');
       }
-
-      if (tableKey === 'api_info') {
-        document.getElementById('tableSection').style.display = 'none';
-        document.getElementById('apiSection').style.display = 'block';
-        return;
-      }
-
-      document.getElementById('tableSection').style.display = 'block';
-      document.getElementById('apiSection').style.display = 'none';
 
       const config = TABLE_CONFIGS[tableKey];
       if (config) {
@@ -499,7 +536,6 @@
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         currentData = await response.json();
 
-        // Оновимо бейдж
         const badge = document.getElementById(`badge-${currentTable}`);
         if (badge) badge.innerText = currentData.length;
 
@@ -517,7 +553,6 @@
       const thead = document.getElementById('tableHead');
       const tbody = document.getElementById('tableBody');
 
-      // Формуємо заголовки таблиці
       let headerHtml = '<tr><th style="width: 70px;">ID</th>';
       config.fields.forEach(f => {
         headerHtml += `<th>${f.label}</th>`;
@@ -525,7 +560,6 @@
       headerHtml += '<th class="text-end" style="width: 140px;">Дії</th></tr>';
       thead.innerHTML = headerHtml;
 
-      // Формуємо рядки таблиці
       if (!dataToRender || dataToRender.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${config.fields.length + 2}" class="text-center py-4 text-muted">Записів не знайдено</td></tr>`;
         return;
@@ -582,7 +616,7 @@
         openModalById('recordModal');
       } catch (err) {
         console.error("openCreateModal error:", err);
-        alert("Помилка відкриття вікна створення: " + err.message);
+        alert("Помилка відкриття вікна: " + err.message);
       }
     }
 
@@ -594,16 +628,12 @@
         document.getElementById('modalTitle').innerText = `Редагування запису #${id} (${config.title})`;
         document.getElementById('editRecordId').value = id;
 
-        // Запитуємо актуальні дані з сервера (разом із завантаженням зв'язаних полів з data_info)
+        // Отримуємо найсвіжіші збагачені дані з сервера
         let itemToEdit = null;
         try {
           const res = await fetch(`${config.apiPath}${id}`);
-          if (res.ok) {
-            itemToEdit = await res.json();
-          }
-        } catch(e) {
-          console.warn("Помилка підвантаження з сервера, використовуємо кеш:", e);
-        }
+          if (res.ok) itemToEdit = await res.json();
+        } catch(e) {}
 
         if (!itemToEdit) {
           itemToEdit = currentData.find(d => Number(d.id) === Number(id)) || {};
@@ -613,7 +643,7 @@
         openModalById('recordModal');
       } catch (err) {
         console.error("openEditModal error:", err);
-        alert("Помилка відкриття вікна редагування: " + err.message);
+        alert("Помилка відкриття форми: " + err.message);
       }
     }
 
@@ -622,6 +652,7 @@
       const container = document.getElementById('formFieldsContainer');
       let fieldsHtml = '';
       let dataInfoSectionAdded = false;
+      let dopDataSectionAdded = false;
 
       config.fields.forEach(f => {
         const val = data[f.key] !== undefined && data[f.key] !== null ? data[f.key] : '';
@@ -633,31 +664,289 @@
             <div class="col-12 mt-3 pt-2 border-top">
               <div class="d-flex align-items-center text-primary fw-bold small mb-1">
                 <i class="bi bi-link-45deg fs-5 me-1"></i>
-                <span>Детальні дані контрагента (автоматично записуються в таблицю data_info):</span>
+                <span>Детальні параметри контрагента (зберігаються у data_info):</span>
               </div>
             </div>
           `;
         }
 
-        fieldsHtml += `
-          <div class="${colClass}">
-            <label class="form-label fw-semibold small ${f.isDataInfo ? 'text-primary' : 'text-secondary'}">${f.label}</label>
-            ${f.type === 'textarea' 
-              ? `<textarea class="form-control" name="${f.key}" rows="3" placeholder="Введіть ${f.label.toLowerCase()}">${val}</textarea>` 
-              : `<input type="text" class="form-control" name="${f.key}" value="${String(val).replace(/"/g, '&quot;')}" placeholder="Введіть ${f.label.toLowerCase()}">`}
-          </div>
-        `;
+        if (f.isDopData && !dopDataSectionAdded) {
+          dopDataSectionAdded = true;
+          fieldsHtml += `
+            <div class="col-12 mt-3 pt-2 border-top">
+              <div class="d-flex align-items-center text-primary fw-bold small mb-1">
+                <i class="bi bi-aspect-ratio fs-5 me-1"></i>
+                <span>Технічні параметри та габарити (авто-синхронізація з dop_data_technika):</span>
+              </div>
+            </div>
+          `;
+        }
+
+        const isHighlight = f.isDataInfo || f.isDopData;
+
+        if (f.strict) {
+          // Спеціальний режим: суворий вибір тільки з існуючих у базі з інтерактивним живим пошуком
+          fieldsHtml += `
+            <div class="${colClass}">
+              <label class="form-label fw-semibold small text-primary d-flex justify-content-between align-items-center">
+                <span>${f.label}</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                  <i class="bi bi-check2-circle me-1"></i>тільки з бази
+                </span>
+              </label>
+              <div class="autocomplete-wrapper">
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-primary">
+                    <i class="bi ${f.lookup === 'people' ? 'bi-person-badge' : 'bi-building'}"></i>
+                  </span>
+                  <input type="text" 
+                         class="form-control strict-lookup-input" 
+                         name="${f.key}" 
+                         id="input_${f.key}" 
+                         data-lookup="${f.lookup}" 
+                         data-strict="true" 
+                         data-label="${f.label}" 
+                         autocomplete="off" 
+                         value="${String(val).replace(/"/g, '&quot;')}" 
+                         placeholder="Почніть вводити назву або оберіть зі списку..." 
+                         oninput="handleAutocompleteInput(this, '${f.lookup}')" 
+                         onfocus="showAutocompleteDropdown(this, '${f.lookup}', false)" 
+                         onblur="setTimeout(() => validateStrictField(this), 250)">
+                  <button class="btn btn-outline-secondary dropdown-toggle" type="button" 
+                          onclick="toggleDropdown('${f.key}', '${f.lookup}')" title="Показати всі доступні варіанти з бази">
+                  </button>
+                </div>
+                <div class="invalid-feedback d-block" id="feedback_${f.key}" style="display: none !important;">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i>Оберіть запис зі списку існуючих у базі даних!
+                </div>
+                <div class="autocomplete-dropdown shadow" id="dropdown_${f.key}"></div>
+              </div>
+            </div>
+          `;
+        } else {
+          const listAttr = f.lookup ? `list="list_${f.lookup}"` : '';
+          const hintText = f.lookup ? `<span class="badge bg-light text-primary border ms-1">пов'язано</span>` : '';
+
+          fieldsHtml += `
+            <div class="${colClass}">
+              <label class="form-label fw-semibold small ${isHighlight ? 'text-primary' : 'text-secondary'}">
+                ${f.label} ${hintText}
+              </label>
+              ${f.type === 'textarea' 
+                ? `<textarea class="form-control" name="${f.key}" rows="3" placeholder="Введіть ${f.label.toLowerCase()}">${val}</textarea>` 
+                : `<input type="text" class="form-control" name="${f.key}" ${listAttr} value="${String(val).replace(/"/g, '&quot;')}" placeholder="Оберіть зі списку або введіть...">`}
+            </div>
+          `;
+        }
       });
 
       container.innerHTML = fieldsHtml;
     }
 
+    // ==========================================
+    // Логіка Autocomplete та суворого вибору з бази
+    // ==========================================
+    function handleAutocompleteInput(inputEl, lookupKey) {
+      showAutocompleteDropdown(inputEl, lookupKey, false);
+      validateStrictField(inputEl, false);
+    }
+
+    function toggleDropdown(fieldKey, lookupKey) {
+      const inputEl = document.getElementById(`input_${fieldKey}`);
+      const dropdownEl = document.getElementById(`dropdown_${fieldKey}`);
+      if (!inputEl || !dropdownEl) return;
+      if (dropdownEl.style.display === 'block') {
+        dropdownEl.style.display = 'none';
+      } else {
+        inputEl.focus();
+        showAutocompleteDropdown(inputEl, lookupKey, true);
+      }
+    }
+
+    function showAutocompleteDropdown(inputEl, lookupKey, showAll = false) {
+      const fieldKey = inputEl.name;
+      const dropdownEl = document.getElementById(`dropdown_${fieldKey}`);
+      if (!dropdownEl) return;
+
+      const rawQuery = inputEl.value.trim().toLowerCase();
+      const items = cachedLookups[lookupKey] || [];
+
+      let matched = [];
+      if (showAll || !rawQuery) {
+        matched = items;
+      } else {
+        matched = items.filter(item => {
+          if (lookupKey === 'kontragents') {
+            const n = (item.name || '').toLowerCase();
+            const fn = (item.full_name || '').toLowerCase();
+            const edrpou = (item.endpou || '').toLowerCase();
+            const ipn = (item.ipn || '').toLowerCase();
+            return n.includes(rawQuery) || fn.includes(rawQuery) || edrpou.includes(rawQuery) || ipn.includes(rawQuery);
+          } else if (lookupKey === 'people') {
+            const fn = (item.full_name || '').toLowerCase();
+            const n = (item.name || '').toLowerCase();
+            const c = (item.code || '').toLowerCase();
+            return fn.includes(rawQuery) || n.includes(rawQuery) || c.includes(rawQuery);
+          } else if (lookupKey === 'nomenklatyra') {
+            const n = (item.name || '').toLowerCase();
+            const c = (item.code || '').toLowerCase();
+            const v = (item.vpv_1_3 || '').toLowerCase();
+            return n.includes(rawQuery) || c.includes(rawQuery) || v.includes(rawQuery);
+          }
+          return false;
+        });
+      }
+
+      if (matched.length === 0) {
+        dropdownEl.innerHTML = `
+          <div class="p-3 text-center text-muted small">
+            <i class="bi bi-search text-warning me-1"></i>
+            За запитом <strong>"${rawQuery}"</strong> нічого не знайдено в базі.
+            <div class="text-danger mt-1 small"><i class="bi bi-shield-x me-1"></i>Дозволено обирати тільки з існуючих у базі!</div>
+          </div>
+        `;
+        dropdownEl.style.display = 'block';
+        return;
+      }
+
+      let html = '';
+      if (!rawQuery && showAll) {
+        html += `<div class="p-2 bg-light text-muted small border-bottom fw-bold"><i class="bi bi-list-check me-1"></i>Всі доступні в базі (${matched.length}):</div>`;
+      } else if (rawQuery) {
+        html += `<div class="p-2 bg-light text-muted small border-bottom"><i class="bi bi-filter me-1"></i>Збігів за назвою: <strong>${matched.length}</strong></div>`;
+      }
+
+      matched.slice(0, 30).forEach(item => {
+        if (lookupKey === 'kontragents') {
+          const mainTitle = item.name || item.full_name;
+          const subInfo = [
+            item.full_name && item.full_name !== item.name ? item.full_name : null,
+            item.endpou ? `ЄДРПОУ: <strong>${item.endpou}</strong>` : null,
+            item.ur_address ? item.ur_address : null
+          ].filter(Boolean).join(' · ');
+
+          html += `
+            <div class="autocomplete-item" onmousedown="selectAutocompleteItem('${fieldKey}', '${String(mainTitle).replace(/'/g, "\\'")}')">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>${mainTitle}</strong>
+                <span class="badge bg-secondary-subtle text-secondary small">#${item.id}</span>
+              </div>
+              ${subInfo ? `<div class="meta-info mt-1 text-truncate">${subInfo}</div>` : ''}
+            </div>
+          `;
+        } else if (lookupKey === 'people') {
+          const mainTitle = item.full_name || item.name;
+          const subInfo = [
+            item.code ? `Табельний №: <strong>${item.code}</strong>` : null,
+            item.name && item.name !== item.full_name ? `Коротке ім'я: ${item.name}` : null
+          ].filter(Boolean).join(' · ');
+
+          html += `
+            <div class="autocomplete-item" onmousedown="selectAutocompleteItem('${fieldKey}', '${String(mainTitle).replace(/'/g, "\\'")}')">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>${mainTitle}</strong>
+                <span class="badge bg-info-subtle text-info small">#${item.id}</span>
+              </div>
+              ${subInfo ? `<div class="meta-info mt-1">${subInfo}</div>` : ''}
+            </div>
+          `;
+        }
+      });
+
+      dropdownEl.innerHTML = html;
+      dropdownEl.style.display = 'block';
+    }
+
+    function selectAutocompleteItem(fieldKey, value) {
+      const inputEl = document.getElementById(`input_${fieldKey}`);
+      const dropdownEl = document.getElementById(`dropdown_${fieldKey}`);
+      if (inputEl) {
+        inputEl.value = value;
+        validateStrictField(inputEl, true);
+      }
+      if (dropdownEl) {
+        dropdownEl.style.display = 'none';
+      }
+    }
+
+    function validateStrictField(inputEl, isDirectSelection = false) {
+      const fieldKey = inputEl.name;
+      const lookupKey = inputEl.getAttribute('data-lookup');
+      const isStrict = inputEl.getAttribute('data-strict') === 'true';
+      const feedbackEl = document.getElementById(`feedback_${fieldKey}`);
+      const val = inputEl.value.trim();
+
+      if (!isStrict) return true;
+
+      if (!val) {
+        // Поле порожнє — допустимо (запис може бути без прив'язаної особи/вантажу)
+        inputEl.classList.remove('is-invalid', 'is-valid');
+        if (feedbackEl) feedbackEl.style.setProperty('display', 'none', 'important');
+        return true;
+      }
+
+      const items = cachedLookups[lookupKey] || [];
+      let found = null;
+
+      if (lookupKey === 'kontragents') {
+        found = items.find(x => 
+          (x.name && x.name.toLowerCase() === val.toLowerCase()) || 
+          (x.full_name && x.full_name.toLowerCase() === val.toLowerCase())
+        );
+      } else if (lookupKey === 'people') {
+        found = items.find(x => 
+          (x.full_name && x.full_name.toLowerCase() === val.toLowerCase()) || 
+          (x.name && x.name.toLowerCase() === val.toLowerCase()) ||
+          (x.code && x.code.toLowerCase() === val.toLowerCase())
+        );
+      }
+ 
+      if (found) {
+        // Застосовуємо точну канонічну назву з бази
+        if (lookupKey === 'kontragents') inputEl.value = found.name;
+        if (lookupKey === 'people') inputEl.value = found.full_name || found.name;
+
+        inputEl.classList.remove('is-invalid');
+        inputEl.classList.add('is-valid');
+        if (feedbackEl) feedbackEl.style.setProperty('display', 'none', 'important');
+        return true;
+      } else {
+        inputEl.classList.remove('is-valid');
+        inputEl.classList.add('is-invalid');
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<i class="bi bi-x-circle-fill me-1"></i>Значення "${val}" відсутнє в базі! Оберіть варіант зі списку.`;
+          feedbackEl.style.setProperty('display', 'block', 'important');
+        }
+        return false;
+      }
+    }
+
+    // Закриття випадаючих списків при кліку поза ними
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.autocomplete-wrapper')) {
+        document.querySelectorAll('.autocomplete-dropdown').forEach(d => d.style.display = 'none');
+      }
+    });
+
     async function submitRecordForm() {
       const config = TABLE_CONFIGS[currentTable];
       if (!config) return;
 
-      const editId = document.getElementById('editRecordId').value;
       const form = document.getElementById('recordForm');
+
+      // Сувора валідація полів, які обов'язково мають бути з бази
+      const strictInputs = form.querySelectorAll('.strict-lookup-input[data-strict="true"]');
+      for (const input of strictInputs) {
+        const isValid = validateStrictField(input);
+        if (!isValid) {
+          input.focus();
+          const label = input.getAttribute('data-label') || input.name;
+          showToast(`Помилка: поле "${label}" повинно бути обране виключно зі списку існуючих у базі!`, false);
+          return;
+        }
+      }
+
+      const editId = document.getElementById('editRecordId').value;
       const formData = new FormData(form);
 
       const payload = {};
@@ -683,7 +972,7 @@
         closeModalById('recordModal');
         showToast(editId ? "Запис успішно оновлено!" : "Запис успішно додано!");
         await loadActiveTableData();
-        await loadAllBadges();
+        await loadAllBadgesAndLookups();
       } catch (e) {
         console.error("submitRecordForm error:", e);
         alert("Помилка при збереженні: " + e.message);
@@ -708,19 +997,19 @@
         if (!res.ok) throw new Error("Не вдалося видалити запис");
 
         closeModalById('deleteModal');
-        showToast("Запис та пов'язані дані в data_info успішно видалено!");
+        showToast("Запис та пов'язані дані успішно видалено!");
         itemToDeleteId = null;
         await loadActiveTableData();
-        await loadAllBadges();
+        await loadAllBadgesAndLookups();
       } catch (e) {
         console.error("confirmDelete error:", e);
         alert("Помилка при видаленні: " + e.message);
       }
     }
 
-    // Ініціалізація при старті сторінки
+    // Запуск при завантаженні сторінки
     window.addEventListener("DOMContentLoaded", () => {
-      loadAllBadges();
+      loadAllBadgesAndLookups();
       switchTable('kontragents');
     });
   </script>

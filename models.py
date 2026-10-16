@@ -152,3 +152,27 @@ class DopDataTechnika(Base):
             "v": self.v,
             "misce_zberiganny": self.misce_zberiganny,
         }
+
+
+class Nomenklatyra(Base):
+    __tablename__ = "nomenklatyra"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String(100), nullable=True)
+    name = Column(String(255), nullable=True, index=True)
+    type = Column(String(100), nullable=True)
+    od_vym = Column(String(50), nullable=True)
+    vpv_1_3 = Column(String(255), nullable=True)
+    dodatkovo = Column(Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "code": self.code,
+            "name": self.name,
+            "type": self.type,
+            "od_vym": self.od_vym,
+            "vpv_1_3": self.vpv_1_3,
+            "dodatkovo": self.dodatkovo,
+        }
+

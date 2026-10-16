@@ -158,13 +158,55 @@ def seed_demo_data():
                 )
             )
 
+        if db.query(models.Nomenklatyra).count() == 0:
+            db.add(
+                models.Nomenklatyra(
+                    code="NOM-101",
+                    name="Пшениця озима 2 клас",
+                    type="Зернові",
+                    od_vym="т",
+                    vpv_1_3="Зерно пшениці насипом, вологість 13.5%",
+                    dodatkovo="ДСТУ 3768:2019",
+                )
+            )
+            db.add(
+                models.Nomenklatyra(
+                    code="NOM-102",
+                    name="Кукурудза",
+                    type="Зернові",
+                    od_vym="т",
+                    vpv_1_3="Зерно кукурудзи насипом",
+                    dodatkovo="3 клас",
+                )
+            )
+            db.add(
+                models.Nomenklatyra(
+                    code="NOM-103",
+                    name="Соняшник",
+                    type="Олійні",
+                    od_vym="т",
+                    vpv_1_3="Насіння соняшнику олійне",
+                    dodatkovo="Олійність 48%",
+                )
+            )
+            db.add(
+                models.Nomenklatyra(
+                    code="NOM-104",
+                    name="Ріпак",
+                    type="Олійні",
+                    od_vym="т",
+                    vpv_1_3="Насіння ріпаку ярого",
+                    dodatkovo="Кондиційний",
+                )
+            )
+
         if db.query(models.Place).count() == 0:
             db.add(
                 models.Place(
                     name="Східне Поле №12",
                     owner="Агро-Трейд",
                     area="145.8 га",
-                    crop="Пшениця озима",
+                    crop="Пшениця озима 2 клас",
                     people="Шевченко Іван Олексійович",
                 )
             )
@@ -172,7 +214,7 @@ def seed_demo_data():
         if db.query(models.Technika).count() == 0:
             db.add(
                 models.Technika(
-                    avtomobil="Тягач",
+                    avtomobil="AX1234CA",
                     misce_ystanovky="Гараж №1",
                     derj_nomer="AX1234CA",
                     vin="WMA06XZZ8LP987654",
@@ -180,7 +222,7 @@ def seed_demo_data():
                     w="2.5",
                     rik="2021",
                     v="85",
-                    ekipaj="Шевченко І.О.",
+                    ekipaj="Шевченко Іван Олексійович",
                     telefony="+380501112233",
                     pricep="Напівпричіп KRONE",
                     kontragent="Агро-Трейд",
@@ -196,7 +238,7 @@ def seed_demo_data():
         if db.query(models.DopDataTechnika).count() == 0:
             db.add(
                 models.DopDataTechnika(
-                    ts="Тягач MAN",
+                    ts="AX1234CA",
                     rik="2021",
                     vin="WMA06XZZ8LP987654",
                     d="12.5",
@@ -399,11 +441,21 @@ def update_kontragent(
 
     new_obj_name = item.name or item.full_name or f"Контрагент #{item.id}"
 
-    # Якщо ім'я контрагента змінилося — синхронізуємо поле object у data_info
+    # Якщо ім'я контрагента змінилося — синхронізуємо поле object у data_info, technika.kontragent та place.owner
     if old_names and old_names[0] != new_obj_name:
         db.query(models.DataInfo).filter(
             models.DataInfo.object.in_(old_names)
         ).update({"object": new_obj_name}, synchronize_session=False)
+
+        # Синхронізуємо перевізника в картках техніки (tehnika ⟷ kontragents)
+        db.query(models.Technika).filter(
+            models.Technika.kontragent.in_(old_names)
+        ).update({"kontragent": item.name}, synchronize_session=False)
+
+        # Синхронізуємо власника точок завантаження (place ⟷ kontragents)
+        db.query(models.Place).filter(
+            models.Place.owner.in_(old_names)
+        ).update({"owner": item.name}, synchronize_session=False)
 
     # Оновлюємо / додаємо / видаляємо записи в data_info для кожного параметра
     param_map = [
@@ -460,7 +512,7 @@ def delete_kontragent(item_id: int, db: Session = Depends(get_db)):
             status_code=404, detail="Контрагента з таким ID не знайдено"
         )
 
-    # Знаходимо всі варіанти назв контрагента для очищення data_info
+    # Знаходимо всі варіанти назв контрагента для очищення data_info, technika та place
     names = [n.strip() for n in [item.name, item.full_name, f"Контрагент #{item.id}"] if n and n.strip()]
 
     # Спочатку видаляємо всі пов'язані записи з таблиці data_info
@@ -469,12 +521,21 @@ def delete_kontragent(item_id: int, db: Session = Depends(get_db)):
             models.DataInfo.object.in_(names)
         ).delete(synchronize_session=False)
 
+        # Очищаємо зв'язки у technika (перевізник) та place (власник)
+        db.query(models.Technika).filter(
+            models.Technika.kontragent.in_(names)
+        ).update({"kontragent": None}, synchronize_session=False)
+
+        db.query(models.Place).filter(
+            models.Place.owner.in_(names)
+        ).update({"owner": None}, synchronize_session=False)
+
     # Видаляємо сам запис контрагента
     db.delete(item)
     db.commit()
     return {
         "status": "success",
-        "message": f"Контрагента #{item_id} та пов'язані дані в data_info видалено",
+        "message": f"Контрагента #{item_id} та пов'язані дані в data_info/техніці видалено",
     }
 
 
@@ -631,10 +692,26 @@ def update_person(
     item = db.query(models.Person).filter(models.Person.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Запис особи не знайдено")
+
+    old_names = [n.strip() for n in [item.name, item.full_name] if n and n.strip()]
+
     for key, value in data.model_dump().items():
         setattr(item, key, value)
     db.commit()
     db.refresh(item)
+
+    new_driver_name = item.full_name or item.name
+    # Якщо ім'я водія змінилося — оновлюємо technika.ekipaj та place.people
+    if old_names and new_driver_name:
+        db.query(models.Technika).filter(
+            models.Technika.ekipaj.in_(old_names)
+        ).update({"ekipaj": new_driver_name}, synchronize_session=False)
+
+        db.query(models.Place).filter(
+            models.Place.people.in_(old_names)
+        ).update({"people": new_driver_name}, synchronize_session=False)
+        db.commit()
+
     return item
 
 
@@ -643,13 +720,200 @@ def delete_person(item_id: int, db: Session = Depends(get_db)):
     item = db.query(models.Person).filter(models.Person.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Запис особи не знайдено")
+
+    names = [n.strip() for n in [item.name, item.full_name] if n and n.strip()]
+
+    # Очищаємо посилання на водія в technika та place
+    if names:
+        db.query(models.Technika).filter(
+            models.Technika.ekipaj.in_(names)
+        ).update({"ekipaj": None}, synchronize_session=False)
+
+        db.query(models.Place).filter(
+            models.Place.people.in_(names)
+        ).update({"people": None}, synchronize_session=False)
+
     db.delete(item)
     db.commit()
-    return {"status": "success", "message": f"Особу #{item_id} видалено"}
+    return {"status": "success", "message": f"Особу #{item_id} та посилання в техніці/місцях видалено"}
 
 
 # ==========================================
-# 4. API: Place
+# Вспоміжні сервісні функції зв'язків між таблицями
+# ==========================================
+def get_data_by_ts(ts: Optional[str], db: Session) -> Optional[dict]:
+    """1. tehnika ⟷ dop_data_tehnika: підтягує технічні параметри (габарити, рік, vin) за держномером/ТЗ."""
+    if not ts or not ts.strip():
+        return None
+    cleaned = ts.strip()
+    dop = (
+        db.query(models.DopDataTechnika)
+        .filter(
+            (models.DopDataTechnika.ts == cleaned)
+            | (models.DopDataTechnika.vin == cleaned)
+        )
+        .first()
+    )
+    if not dop:
+        dop = (
+            db.query(models.DopDataTechnika)
+            .filter(
+                (models.DopDataTechnika.ts.ilike(f"%{cleaned}%"))
+                | (models.DopDataTechnika.vin.ilike(f"%{cleaned}%"))
+            )
+            .first()
+        )
+    return dop.to_dict() if dop else None
+
+
+def getvodiy(ekipaj: Optional[str], db: Session) -> Optional[dict]:
+    """3. tehnika ⟷ people: знаходить повний запис водія/співробітника в таблиці people."""
+    if not ekipaj or not ekipaj.strip():
+        return None
+    cleaned = ekipaj.strip()
+    person = (
+        db.query(models.Person)
+        .filter(
+            (models.Person.name == cleaned)
+            | (models.Person.full_name == cleaned)
+            | (models.Person.code == cleaned)
+        )
+        .first()
+    )
+    if not person:
+        person = (
+            db.query(models.Person)
+            .filter(
+                (models.Person.full_name.ilike(f"%{cleaned}%"))
+                | (models.Person.name.ilike(f"%{cleaned}%"))
+            )
+            .first()
+        )
+    return person.to_dict() if person else None
+
+
+def get_kontragent_info(kontragent_name: Optional[str], db: Session) -> Optional[dict]:
+    """2. tehnika ⟷ kontragents: підтягує повні реквізити контрагента-перевізника та його адресу з data_info."""
+    if not kontragent_name or not kontragent_name.strip():
+        return None
+    cleaned = kontragent_name.strip()
+    k_obj = (
+        db.query(models.Kontragent)
+        .filter(
+            (models.Kontragent.name == cleaned)
+            | (models.Kontragent.full_name == cleaned)
+        )
+        .first()
+    )
+    if not k_obj:
+        k_obj = (
+            db.query(models.Kontragent)
+            .filter(
+                (models.Kontragent.name.ilike(f"%{cleaned}%"))
+                | (models.Kontragent.full_name.ilike(f"%{cleaned}%"))
+            )
+            .first()
+        )
+    if not k_obj:
+        return None
+
+    res = k_obj.to_dict()
+    # Підтягуємо юридичну адресу та контакти з data_info
+    names = [n for n in [k_obj.name, k_obj.full_name] if n]
+    infos = db.query(models.DataInfo).filter(models.DataInfo.object.in_(names)).all()
+    for inf in infos:
+        k_low = (inf.k or "").lower()
+        if any(term in k_low for term in ["адрес", "address", "юр"]):
+            res["ur_address"] = inf.v
+        elif any(term in k_low for term in ["телефон", "phone", "тел"]):
+            res["phone"] = inf.v
+        elif any(term in k_low for term in ["факс", "fax"]):
+            res["fax"] = inf.v
+    return res
+
+
+def get_nomenklatyra_info(crop_name: Optional[str], db: Session) -> Optional[dict]:
+    """5. place ⟷ nomenklatyra: підтягує культуру та її характеристики для ТТН (vpv_1_3)."""
+    if not crop_name or not crop_name.strip():
+        return None
+    cleaned = crop_name.strip()
+    nom = (
+        db.query(models.Nomenklatyra)
+        .filter(
+            (models.Nomenklatyra.name == cleaned)
+            | (models.Nomenklatyra.code == cleaned)
+        )
+        .first()
+    )
+    if not nom:
+        nom = (
+            db.query(models.Nomenklatyra)
+            .filter(models.Nomenklatyra.name.ilike(f"%{cleaned}%"))
+            .first()
+        )
+    return nom.to_dict() if nom else None
+
+
+def enrich_place(item: models.Place, db: Session) -> schemas.PlaceResponse:
+    """Збагачує пункт завантаження відповідальною особою (people) та культурою (nomenklatyra)."""
+    people_info = getvodiy(item.people, db)
+    crop_info = get_nomenklatyra_info(item.crop, db)
+    return schemas.PlaceResponse(
+        id=item.id,
+        name=item.name,
+        owner=item.owner,
+        area=item.area,
+        crop=item.crop,
+        people=item.people,
+        people_info=people_info,
+        crop_info=crop_info,
+    )
+
+
+def enrich_technika(item: models.Technika, db: Session) -> schemas.TechnikaResponse:
+    """Збагачує техніку габаритами з dop_data_technika, перевізником з kontragents та водієм з people."""
+    ts_key = item.avtomobil or item.derj_nomer
+    dop = get_data_by_ts(ts_key, db)
+    kontr = get_kontragent_info(item.kontragent, db)
+    vodiy = getvodiy(item.ekipaj, db)
+
+    # Якщо габарити або рік відсутні безпосередньо в картці — підставляємо з dop_data_technika
+    d_val = item.d or (dop.get("d") if dop else None)
+    w_val = item.w or (dop.get("w") if dop else None)
+    v_val = item.v or (dop.get("v") if dop else None)
+    rik_val = item.rik or (dop.get("rik") if dop else None)
+    vin_val = item.vin or (dop.get("vin") if dop else None)
+    misce_val = dop.get("misce_zberiganny") if dop else None
+
+    return schemas.TechnikaResponse(
+        id=item.id,
+        avtomobil=item.avtomobil,
+        misce_ystanovky=item.misce_ystanovky,
+        derj_nomer=item.derj_nomer,
+        vin=vin_val,
+        d=d_val,
+        w=w_val,
+        rik=rik_val,
+        v=v_val,
+        ekipaj=item.ekipaj,
+        telefony=item.telefony,
+        pricep=item.pricep,
+        kontragent=item.kontragent,
+        model=item.model,
+        kolir=item.kolir,
+        telegram=item.telegram,
+        medcode=item.medcode,
+        wialon_id=item.wialon_id,
+        dodatkovo=item.dodatkovo,
+        misce_zberiganny=misce_val,
+        dop_data=dop,
+        kontragent_info=kontr,
+        vodiy_info=vodiy,
+    )
+
+
+# ==========================================
+# 4. API: Place (Точки завантаження/розвантаження)
 # ==========================================
 @app.get(
     "/api/place/",
@@ -668,8 +932,10 @@ def get_places(
             (models.Place.name.ilike(f"%{search}%"))
             | (models.Place.owner.ilike(f"%{search}%"))
             | (models.Place.crop.ilike(f"%{search}%"))
+            | (models.Place.people.ilike(f"%{search}%"))
         )
-    return query.offset(skip).limit(limit).all()
+    items = query.offset(skip).limit(limit).all()
+    return [enrich_place(p, db) for p in items]
 
 
 @app.get(
@@ -681,7 +947,7 @@ def get_place(item_id: int, db: Session = Depends(get_db)):
     item = db.query(models.Place).filter(models.Place.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Місце / поле не знайдено")
-    return item
+    return enrich_place(item, db)
 
 
 @app.post(
@@ -695,7 +961,7 @@ def create_place(data: schemas.PlaceCreate, db: Session = Depends(get_db)):
     db.add(item)
     db.commit()
     db.refresh(item)
-    return item
+    return enrich_place(item, db)
 
 
 @app.put(
@@ -713,7 +979,7 @@ def update_place(
         setattr(item, key, value)
     db.commit()
     db.refresh(item)
-    return item
+    return enrich_place(item, db)
 
 
 @app.delete("/api/place/{item_id}", tags=["4. Place"])
@@ -727,7 +993,7 @@ def delete_place(item_id: int, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# 5. API: Technika
+# 5. API: Technika (Транспорт зі зв'язками)
 # ==========================================
 @app.get(
     "/api/technika/",
@@ -748,8 +1014,10 @@ def get_technika_list(
             | (models.Technika.vin.ilike(f"%{search}%"))
             | (models.Technika.model.ilike(f"%{search}%"))
             | (models.Technika.kontragent.ilike(f"%{search}%"))
+            | (models.Technika.ekipaj.ilike(f"%{search}%"))
         )
-    return query.offset(skip).limit(limit).all()
+    items = query.offset(skip).limit(limit).all()
+    return [enrich_technika(item, db) for item in items]
 
 
 @app.get(
@@ -763,7 +1031,49 @@ def get_technika_item(item_id: int, db: Session = Depends(get_db)):
     )
     if not item:
         raise HTTPException(status_code=404, detail="Техніку не знайдено")
-    return item
+    return enrich_technika(item, db)
+
+
+def validate_technika_linked_fields(data_dict: dict, db: Session):
+    """Перевіряє, що контрагент та екіпаж/водій існують у базі даних (суворий вибір)."""
+    kontragent = data_dict.get("kontragent")
+    if kontragent and str(kontragent).strip():
+        k_clean = str(kontragent).strip()
+        k_found = db.query(models.Kontragent).filter(
+            (models.Kontragent.name == k_clean)
+            | (models.Kontragent.full_name == k_clean)
+        ).first()
+        if not k_found:
+            k_found = db.query(models.Kontragent).filter(
+                (models.Kontragent.name.ilike(k_clean))
+                | (models.Kontragent.full_name.ilike(k_clean))
+            ).first()
+        if not k_found:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Контрагента '{k_clean}' не знайдено в базі даних. Оберіть контрагента з існуючих у базі."
+            )
+        data_dict["kontragent"] = k_found.name
+
+    ekipaj = data_dict.get("ekipaj")
+    if ekipaj and str(ekipaj).strip():
+        e_clean = str(ekipaj).strip()
+        p_found = db.query(models.Person).filter(
+            (models.Person.full_name == e_clean)
+            | (models.Person.name == e_clean)
+            | (models.Person.code == e_clean)
+        ).first()
+        if not p_found:
+            p_found = db.query(models.Person).filter(
+                (models.Person.full_name.ilike(e_clean))
+                | (models.Person.name.ilike(e_clean))
+            ).first()
+        if not p_found:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Водія/екіпаж '{e_clean}' не знайдено в базі даних. Оберіть особу з існуючих у базі."
+            )
+        data_dict["ekipaj"] = p_found.full_name or p_found.name
 
 
 @app.post(
@@ -775,11 +1085,48 @@ def get_technika_item(item_id: int, db: Session = Depends(get_db)):
 def create_technika(
     data: schemas.TechnikaCreate, db: Session = Depends(get_db)
 ):
-    item = models.Technika(**data.model_dump())
+    data_dict = data.model_dump()
+    misce_zberiganny = data_dict.pop("misce_zberiganny", None)
+
+    # Перевіряємо, що контрагент та екіпаж існують в базі даних
+    validate_technika_linked_fields(data_dict, db)
+
+    item = models.Technika(**data_dict)
     db.add(item)
     db.commit()
     db.refresh(item)
-    return item
+
+    # 1. Автоматично синхронізуємо запис у dop_data_technika
+    ts_key = (item.avtomobil or item.derj_nomer or "").strip()
+    if ts_key:
+        existing_dop = (
+            db.query(models.DopDataTechnika)
+            .filter(models.DopDataTechnika.ts == ts_key)
+            .first()
+        )
+        if existing_dop:
+            if item.d: existing_dop.d = item.d
+            if item.w: existing_dop.w = item.w
+            if item.v: existing_dop.v = item.v
+            if item.rik: existing_dop.rik = item.rik
+            if item.vin: existing_dop.vin = item.vin
+            if misce_zberiganny: existing_dop.misce_zberiganny = misce_zberiganny
+        else:
+            if any([item.d, item.w, item.v, item.rik, item.vin, misce_zberiganny]):
+                db.add(
+                    models.DopDataTechnika(
+                        ts=ts_key,
+                        rik=item.rik,
+                        vin=item.vin,
+                        d=item.d,
+                        w=item.w,
+                        v=item.v,
+                        misce_zberiganny=misce_zberiganny,
+                    )
+                )
+        db.commit()
+
+    return enrich_technika(item, db)
 
 
 @app.put(
@@ -795,11 +1142,69 @@ def update_technika(
     )
     if not item:
         raise HTTPException(status_code=404, detail="Техніку не знайдено")
-    for key, value in data.model_dump().items():
+
+    old_ts = (item.avtomobil or item.derj_nomer or "").strip()
+    data_dict = data.model_dump()
+    misce_zberiganny = data_dict.pop("misce_zberiganny", None)
+
+    # Перевіряємо, що контрагент та екіпаж існують в базі даних
+    validate_technika_linked_fields(data_dict, db)
+
+    for key, value in data_dict.items():
         setattr(item, key, value)
     db.commit()
     db.refresh(item)
-    return item
+
+    new_ts = (item.avtomobil or item.derj_nomer or "").strip()
+
+    # Якщо змінився номер/назва авто — оновлюємо ts у dop_data_technika
+    if old_ts and new_ts and old_ts != new_ts:
+        db.query(models.DopDataTechnika).filter(
+            models.DopDataTechnika.ts == old_ts
+        ).update({"ts": new_ts}, synchronize_session=False)
+
+    # Синхронізуємо або оновлюємо габарити в dop_data_technika
+    if new_ts:
+        existing_dop = (
+            db.query(models.DopDataTechnika)
+            .filter(models.DopDataTechnika.ts == new_ts)
+            .first()
+        )
+        if existing_dop:
+            existing_dop.d = item.d
+            existing_dop.w = item.w
+            existing_dop.v = item.v
+            existing_dop.rik = item.rik
+            existing_dop.vin = item.vin
+            if misce_zberiganny is not None:
+                existing_dop.misce_zberiganny = misce_zberiganny
+
+            # Якщо всі габарити стерті користувачем — видаляємо порожній рядок з dop_data_technika
+            has_any_data = any([
+                (existing_dop.d or "").strip(),
+                (existing_dop.w or "").strip(),
+                (existing_dop.v or "").strip(),
+                (existing_dop.rik or "").strip(),
+                (existing_dop.vin or "").strip(),
+                (existing_dop.misce_zberiganny or "").strip(),
+            ])
+            if not has_any_data:
+                db.delete(existing_dop)
+        else:
+            if any([item.d, item.w, item.v, item.rik, item.vin, misce_zberiganny]):
+                db.add(
+                    models.DopDataTechnika(
+                        ts=new_ts,
+                        rik=item.rik,
+                        vin=item.vin,
+                        d=item.d,
+                        w=item.w,
+                        v=item.v,
+                        misce_zberiganny=misce_zberiganny,
+                    )
+                )
+    db.commit()
+    return enrich_technika(item, db)
 
 
 @app.delete("/api/technika/{item_id}", tags=["5. Technika"])
@@ -809,9 +1214,17 @@ def delete_technika(item_id: int, db: Session = Depends(get_db)):
     )
     if not item:
         raise HTTPException(status_code=404, detail="Техніку не знайдено")
+
+    ts_keys = [t.strip() for t in [item.avtomobil, item.derj_nomer, item.vin] if t and t.strip()]
+    if ts_keys:
+        db.query(models.DopDataTechnika).filter(
+            (models.DopDataTechnika.ts.in_(ts_keys))
+            | (models.DopDataTechnika.vin.in_(ts_keys))
+        ).delete(synchronize_session=False)
+
     db.delete(item)
     db.commit()
-    return {"status": "success", "message": f"Техніку #{item_id} видалено"}
+    return {"status": "success", "message": f"Техніку #{item_id} та пов'язані габарити в dop_data_technika видалено"}
 
 
 # ==========================================
@@ -869,6 +1282,21 @@ def create_dop_data_technika(
     db.add(item)
     db.commit()
     db.refresh(item)
+
+    # Двостороння синхронізація: якщо існує запис у technika з таким ТС — оновлюємо його габарити
+    if item.ts:
+        clean_ts = item.ts.strip()
+        autos = db.query(models.Technika).filter(
+            (models.Technika.avtomobil == clean_ts) | (models.Technika.derj_nomer == clean_ts)
+        ).all()
+        for auto in autos:
+            if item.rik: auto.rik = item.rik
+            if item.vin: auto.vin = item.vin
+            if item.d: auto.d = item.d
+            if item.w: auto.w = item.w
+            if item.v: auto.v = item.v
+        db.commit()
+
     return item
 
 
@@ -891,10 +1319,27 @@ def update_dop_data_technika(
         raise HTTPException(
             status_code=404, detail="Запис додаткових даних техніки не знайдено"
         )
+
+    old_ts = (item.ts or "").strip()
     for key, value in data.model_dump().items():
         setattr(item, key, value)
     db.commit()
     db.refresh(item)
+
+    # Двостороння синхронізація: оновлюємо пов'язані записи в technika
+    ts_list = [t for t in [old_ts, (item.ts or "").strip()] if t]
+    if ts_list:
+        autos = db.query(models.Technika).filter(
+            (models.Technika.avtomobil.in_(ts_list)) | (models.Technika.derj_nomer.in_(ts_list))
+        ).all()
+        for auto in autos:
+            auto.rik = item.rik
+            auto.vin = item.vin
+            auto.d = item.d
+            auto.w = item.w
+            auto.v = item.v
+        db.commit()
+
     return item
 
 
@@ -909,20 +1354,152 @@ def delete_dop_data_technika(item_id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=404, detail="Запис додаткових даних техніки не знайдено"
         )
+    ts_val = (item.ts or "").strip()
     db.delete(item)
     db.commit()
+
+    # Двостороннє очищення: очищаємо габарити у відповідній техніці
+    if ts_val:
+        autos = db.query(models.Technika).filter(
+            (models.Technika.avtomobil == ts_val) | (models.Technika.derj_nomer == ts_val)
+        ).all()
+        for auto in autos:
+            auto.d = None
+            auto.w = None
+            auto.v = None
+        db.commit()
+
     return {
         "status": "success",
-        "message": f"Додаткові дані техніки #{item_id} видалено",
+        "message": f"Додаткові дані техніки #{item_id} та пов'язані габарити видалено",
     }
 
+
+# ==========================================
+# 7. API: Nomenklatyra (Культури / Вантажі)
+# ==========================================
+@app.get(
+    "/api/nomenklatyra/",
+    response_model=List[schemas.NomenklatyraResponse],
+    tags=["7. Nomenklatyra"],
+)
+def get_nomenklatyra_list(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    query = db.query(models.Nomenklatyra)
+    if search:
+        query = query.filter(
+            (models.Nomenklatyra.name.ilike(f"%{search}%"))
+            | (models.Nomenklatyra.code.ilike(f"%{search}%"))
+            | (models.Nomenklatyra.type.ilike(f"%{search}%"))
+            | (models.Nomenklatyra.vpv_1_3.ilike(f"%{search}%"))
+        )
+    return query.offset(skip).limit(limit).all()
+
+
+@app.get(
+    "/api/nomenklatyra/{item_id}",
+    response_model=schemas.NomenklatyraResponse,
+    tags=["7. Nomenklatyra"],
+)
+def get_nomenklatyra_item(item_id: int, db: Session = Depends(get_db)):
+    item = (
+        db.query(models.Nomenklatyra)
+        .filter(models.Nomenklatyra.id == item_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Товар/культуру не знайдено")
+    return item
+
+
+@app.post(
+    "/api/nomenklatyra/",
+    response_model=schemas.NomenklatyraResponse,
+    status_code=201,
+    tags=["7. Nomenklatyra"],
+)
+def create_nomenklatyra(
+    data: schemas.NomenklatyraCreate, db: Session = Depends(get_db)
+):
+    item = models.Nomenklatyra(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@app.put(
+    "/api/nomenklatyra/{item_id}",
+    response_model=schemas.NomenklatyraResponse,
+    tags=["7. Nomenklatyra"],
+)
+def update_nomenklatyra(
+    item_id: int,
+    data: schemas.NomenklatyraUpdate,
+    db: Session = Depends(get_db),
+):
+    item = (
+        db.query(models.Nomenklatyra)
+        .filter(models.Nomenklatyra.id == item_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Товар/культуру не знайдено")
+
+    old_names = [n.strip() for n in [item.name, item.code] if n and n.strip()]
+
+    for key, value in data.model_dump().items():
+        setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+
+    # Якщо назва вантажу змінилася — оновлюємо закріплену культуру в place.crop (place ⟷ nomenklatyra)
+    if old_names and item.name:
+        db.query(models.Place).filter(
+            models.Place.crop.in_(old_names)
+        ).update({"crop": item.name}, synchronize_session=False)
+        db.commit()
+
+    return item
+
+
+@app.delete("/api/nomenklatyra/{item_id}", tags=["7. Nomenklatyra"])
+def delete_nomenklatyra(item_id: int, db: Session = Depends(get_db)):
+    item = (
+        db.query(models.Nomenklatyra)
+        .filter(models.Nomenklatyra.id == item_id)
+        .first()
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Товар/культуру не знайдено")
+
+    names = [n.strip() for n in [item.name, item.code] if n and n.strip()]
+
+    # Очищаємо прив'язку культури/вантажу в точках завантаження (place)
+    if names:
+        db.query(models.Place).filter(
+            models.Place.crop.in_(names)
+        ).update({"crop": None}, synchronize_session=False)
+
+    db.delete(item)
+    db.commit()
+    return {"status": "success", "message": f"Номенклатуру #{item_id} та пов'язані посилання в складах видалено"}
+
+
+# ==========================================
+# 8. TTN & Interconnected Services
+# ==========================================
 
 # ==========================================
 # Export All Database Tables (Full JSON Dump)
 # ==========================================
 @app.get("/api/export/all", tags=["Database Export"])
 def export_all_database(db: Session = Depends(get_db)):
-    """Повертає повний JSON дамп усіх 6 таблиць локальної бази даних."""
+    """Повертає повний JSON дамп усіх 7 таблиць бази даних."""
     return {
         "kontragents": [x.to_dict() for x in db.query(models.Kontragent).all()],
         "data_info": [x.to_dict() for x in db.query(models.DataInfo).all()],
@@ -931,6 +1508,9 @@ def export_all_database(db: Session = Depends(get_db)):
         "technika": [x.to_dict() for x in db.query(models.Technika).all()],
         "dop_data_technika": [
             x.to_dict() for x in db.query(models.DopDataTechnika).all()
+        ],
+        "nomenklatyra": [
+            x.to_dict() for x in db.query(models.Nomenklatyra).all()
         ],
     }
 
@@ -943,4 +1523,4 @@ if __name__ == "__main__":
     print("Веб-інтерфейс:     http://127.0.0.1:8000")
     print("Документація API:  http://127.0.0.1:8000/docs")
     print("=" * 60)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

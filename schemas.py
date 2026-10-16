@@ -100,6 +100,8 @@ class PlaceUpdate(PlaceBase):
 
 class PlaceResponse(PlaceBase):
     id: int
+    people_info: Optional[dict] = None
+    crop_info: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -128,15 +130,19 @@ class TechnikaBase(BaseModel):
 
 
 class TechnikaCreate(TechnikaBase):
-    pass
+    misce_zberiganny: Optional[str] = None
 
 
 class TechnikaUpdate(TechnikaBase):
-    pass
+    misce_zberiganny: Optional[str] = None
 
 
 class TechnikaResponse(TechnikaBase):
     id: int
+    misce_zberiganny: Optional[str] = None
+    dop_data: Optional[dict] = None
+    kontragent_info: Optional[dict] = None
+    vodiy_info: Optional[dict] = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -164,3 +170,45 @@ class DopDataTechnikaUpdate(DopDataTechnikaBase):
 class DopDataTechnikaResponse(DopDataTechnikaBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# 7. Nomenklatyra (Номенклатура / Вантажі)
+# ==========================================
+class NomenklatyraBase(BaseModel):
+    code: Optional[str] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
+    od_vym: Optional[str] = None
+    vpv_1_3: Optional[str] = None
+    dodatkovo: Optional[str] = None
+
+
+class NomenklatyraCreate(NomenklatyraBase):
+    pass
+
+
+class NomenklatyraUpdate(NomenklatyraBase):
+    pass
+
+
+class NomenklatyraResponse(NomenklatyraBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# 8. TTN Auto Fill Combined Response
+# ==========================================
+class TTNAutoFillResponse(BaseModel):
+    avtomobil: Optional[str] = None
+    derj_nomer: Optional[str] = None
+    model: Optional[str] = None
+    pricep: Optional[str] = None
+    gabaryty: Optional[dict] = None  # d, w, v, rik, vin, misce_zberiganny
+    pereviznyk: Optional[dict] = None  # kontragent info + ur_address
+    vodiy: Optional[dict] = None  # people info (name, full_name, code)
+    punkt_navantazhennya: Optional[dict] = None  # place info
+    komirnyk_zdav: Optional[dict] = None  # responsible person at place
+    vantazh_nomenklatyra: Optional[dict] = None  # crop with vpv_1_3
+
